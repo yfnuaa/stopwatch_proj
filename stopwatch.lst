@@ -1,0 +1,563 @@
+C51 COMPILER V9.01   STOPWATCH                                                             12/20/2018 20:23:40 PAGE 1   
+
+
+C51 COMPILER V9.01, COMPILATION OF MODULE STOPWATCH
+OBJECT MODULE PLACED IN stopwatch.obj
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE src\stopwatch.c COMPACT BROWSE PRINT(.\stopwatch.lst) OBJECT(stopwatch.obj)
+
+line level    source
+
+   1          #include "../h/port.h"
+   2          #include "../h/utility.h"
+   3          #include "string.h"
+   4          #include "../h/82c55.h"
+   5          #include "../h/serial.h"
+   6                                      //_nop_();延时函数用
+   7          #include "../h/scroll.h"
+   8          #include "../h/led.h" 
+   9          #include "../h/stopwatch.h"
+  10          #include "../h/alarm.h"
+  11          #include "../h/ds1302.h"
+  12          #include "../h/eeprom.h"
+  13          #include "../h/systimer.h"
+  14          #include "../h/keyprocess.h"
+  15          #include "../h/voltage.h"
+  16          volatile bit g_1ms_triggered = 0;
+  17          static   bit g_paused = 0; // send_integ(g_poll_ds1302_timer_start);          
+  18           
+  19          //7 seg led refresh timer---------------------
+  20          uchar g_refresh_battery_icon_start = e_timer_stop; 
+  21          #define BATTERY_ICON_FLASH 1  
+  22          //--------------------------------------------
+  23          uchar g_saved_count_time   = 0;
+  24          char  g_timer_to_count_min = 0;
+  25          char  g_timer_to_count_sec = 0;
+  26          //some system used timer---------------------------------------------------------------
+  27          #ifdef TEST
+              uchar volatile g_1s_test_timer       = e_timer_stop;
+              #endif
+  30          uchar volatile g_100ms_timer         = e_timer_stop;      //used for scroll 
+  31          uchar volatile g_alarm_timeout_timer = e_timer_stop;      //used for alarm timer out time
+  32          uchar volatile g_1s_key_timer        = e_timer_stop;      //used for key press time
+  33          
+  34          uchar volatile g_1min_sys_idle_timer = e_timer_stop;
+  35          uchar volatile g_sys_idle_time_1min  = 0; 
+  36          
+  37          uchar volatile g_1min_poll_battery_timer   =  e_timer_finished;// used for poll battery voltage
+  38          unsigned int g_poll_voltage_timer_interval = 0;
+  39          
+  40          
+  41          //-------------------------------------------------------------------------------------
+  42          
+  43          //ds1302 poll timer-------------------------------------------s
+  44          uchar volatile g_poll_ds1302_timer_start  = e_timer_stop;
+  45          unsigned int volatile g_poll_ds1302_timer = 0;
+  46          //------------------------------------------------------------
+  47          
+  48          //alarm led blink timer---------------------------------------
+  49          char g_blink_function_start      = e_timer_stop;
+  50          unsigned int g_blink_led_counter = 0;
+  51          bit g_blink_off_flag             = 0;
+  52          #define BLINK_OFF_MS 201
+  53          #define BLINK_ON_MS  301
+  54          //------------------------------------------------------------
+  55          
+C51 COMPILER V9.01   STOPWATCH                                                             12/20/2018 20:23:40 PAGE 2   
+
+  56          #define check_timer(g_poll_start, old_poll_ticket, COUNT_TICKET)       \
+  57          {                                                                      \
+  58              if(e_timer_start == g_poll_start)                                  \
+  59              {                                                                  \
+  60                  old_poll_ticket = g_sys_1ms_ticket;                            \
+  61                  g_poll_start    = e_timer_counting;                            \
+  62              }                                                                  \                       
+  63              else if(e_timer_counting == g_poll_start)                          \
+  64              {                                                                  \
+  65                  if(old_poll_ticket < g_sys_1ms_ticket)                         \
+  66                  {                                                              \
+  67                      temp = g_sys_1ms_ticket - old_poll_ticket;                 \
+  68                  }                                                              \
+  69                  else                                                           \
+  70                  {                                                              \ 
+  71                      temp = 0xffff - old_poll_ticket + 1 + g_sys_1ms_ticket;    \
+  72                  }                                                              \
+  73                  if(temp >= COUNT_TICKET) g_poll_start = e_timer_finished;      \
+  74              }                                                                  \
+  75          }                                                                    
+  76                                                        
+  77          void calc_time()
+  78          {
+  79   1          unsigned int temp =0;
+  80   1          static unsigned int old_5s_timer_ticket     = 0;
+  81   1          static unsigned int old_100ms_timer_ticket  = 0;
+  82   1          static unsigned int old_poll_ds1302_ticket  = 0;
+  83   1          static unsigned int old_blink_ticket        = 0;
+  84   1          static unsigned int olg_battery_icon_flash_ticket = 0;
+  85   1          static unsigned int old_key_pressing_ticket = 0;
+  86   1          static unsigned int old_1min_timeout_ticket = 0;
+  87   1          static unsigned int old_poll_battery_timer_ticket = 0;
+  88   1      
+  89   1          #ifdef TEST 
+                  static unsigned int old_1s_testtimer_ticket  = 0;
+                  check_timer(g_1s_test_timer, old_1s_testtimer_ticket, 1000);
+                  #endif
+  93   1      
+  94   1          //100ms timer check        //100ms timer check//100ms timer check
+  95   1          check_timer(g_100ms_timer, old_100ms_timer_ticket, 100)
+  96   1          check_timer(g_1min_sys_idle_timer, old_1min_timeout_ticket, 60000);   
+  97   1          check_timer(g_1min_poll_battery_timer, old_poll_battery_timer_ticket,60000);                          
+             -    
+  98   1          check_timer(g_1s_key_timer, old_key_pressing_ticket, 1000);
+  99   1          //5s timer check  
+ 100   1          check_timer(g_alarm_timeout_timer, old_5s_timer_ticket, 8000);
+ 101   1       
+ 102   1          //ds1302s check          //used for poll ds1302 sec; //first timer ==960, then 10ms one time until 1s 
+             -trigger from ds1302
+ 103   1          check_timer(g_poll_ds1302_timer_start, old_poll_ds1302_ticket, g_poll_ds1302_timer);//g_poll_ds1302_ti
+             -mer);
+ 104   1       
+ 105   1          //flash battery timer
+ 106   1          check_timer(g_refresh_battery_icon_start, olg_battery_icon_flash_ticket, BATTERY_ICON_FLASH);
+ 107   1      
+ 108   1          // for blink led
+ 109   1          check_timer(g_blink_function_start, old_blink_ticket, g_blink_led_counter);
+ 110   1          if(e_timer_finished == g_blink_function_start)
+ 111   1          {
+ 112   2              g_blink_off_flag = !g_blink_off_flag;    //g_blink_flag ==1 led off ,
+ 113   2              if(g_blink_off_flag)
+ 114   2              {
+C51 COMPILER V9.01   STOPWATCH                                                             12/20/2018 20:23:40 PAGE 3   
+
+ 115   3                  g_blink_led_counter = BLINK_OFF_MS;
+ 116   3                  black_display();
+ 117   3                              stop_alarm();
+ 118   3              }
+ 119   2              else
+ 120   2              {       
+ 121   3                      start_alarm();
+ 122   3                  g_blink_led_counter = BLINK_ON_MS;
+ 123   3                  update_min(g_timer_to_count_min);
+ 124   3                  update_sec(g_timer_to_count_sec);
+ 125   3              }
+ 126   2              g_blink_function_start  = e_timer_start;
+ 127   2         }
+ 128   1      }
+ 129           
+ 130          
+ 131          char  volatile g_sys_state = e_idle;
+ 132          sbit g_key_state = P1^0;
+ 133          void init_hardware(void)
+ 134          {
+ 135   1          //init_low_power_inter();// low voltage detect...
+ 136   1          enable_voltage_read_init();
+ 137   1          serial_port_init        ();  
+ 138   1          init_timer ();
+ 139   1          ds1302_init();
+ 140   1          ds1302_stop();
+ 141   1          init_display ();
+ 142   1          black_display();
+ 143   1      }
+ 144          
+ 145          #define init_timer_and_state()                    \
+ 146          {   g_sys_state = e_idle;  stop_alarm();          \
+ 147              init_scroll();                                \
+ 148              g_1min_sys_idle_timer = e_timer_stop;         \
+ 149              g_sys_idle_time_1min  = 0;                    \
+ 150              g_blink_function_start = e_timer_stop;        \
+ 151              g_blink_off_flag = 0;                         \
+ 152              g_poll_ds1302_timer_start = e_timer_stop;     \
+ 153              g_100ms_timer  = e_timer_stop;                \
+ 154              g_1s_key_timer = e_timer_stop;                \
+ 155              g_alarm_timeout_timer    = e_timer_stop;      \
+ 156              g_timer_to_count_min = 0;                     \
+ 157              g_timer_to_count_sec = 0;                     \
+ 158              g_key_released = 0; g_key_pressed = 0;        \ 
+ 159              g_key_pressing_1s = 0; g_paused = 0;          \
+ 160              g_poll_voltage_timer_interval = 0;            \
+ 161              g_1min_poll_battery_timer = e_timer_finished; \
+ 162          }
+ 163          
+ 164          bit g_wakeup_from_sleep_flag = 0;
+ 165           
+ 166          uchar g_battery = 0;
+ 167          uchar g_battery_display = 0;
+ 168          void poll_voltage()                                                 \
+ 169          {                                                                   \
+ 170              if(e_timer_finished == g_1min_poll_battery_timer)               \
+ 171              {                                                               \
+ 172                  g_poll_voltage_timer_interval++;                            \
+ 173                  g_1min_poll_battery_timer= e_timer_start;                   \
+ 174              }                                                               \
+ 175              else if(e_timer_stop == g_1min_poll_battery_timer)              \
+ 176              {                                                               \
+C51 COMPILER V9.01   STOPWATCH                                                             12/20/2018 20:23:40 PAGE 4   
+
+ 177                  g_1min_poll_battery_timer = e_timer_start;                  \
+ 178              }                                                               \
+ 179              if(g_poll_voltage_timer_interval <30) return;                   \
+ 180                                                                              \
+ 181              g_battery = get_voltage();                                      \
+ 182              if(g_battery == -1){ return; }                                  \
+ 183              g_poll_voltage_timer_interval = 0;                              \
+ 184              if(g_battery == 0)                                              \
+ 185              {                                                               \
+ 186                  send_buffer("low voltage!");                                \
+ 187                  if(g_refresh_battery_icon_start == e_timer_stop)            \
+ 188                  {                                                           \
+ 189                      g_refresh_battery_icon_start = e_timer_start;           \
+ 190                      g_battery_display = 1;                                  \
+ 191                  }                                                           \
+ 192                  else if( e_timer_finished == g_refresh_battery_icon_start)  \
+ 193                  {                                                           \
+ 194                      g_battery_display = !g_battery_display;                 \
+ 195                      g_refresh_battery_icon_start = e_timer_start;           \
+ 196                  }                                                           \
+ 197              }                                                               \
+ 198              else if(g_battery > 0)                                          \
+ 199              {                                                               \
+ 200                  g_battery_display = g_battery;                              \
+ 201              }                                                               \
+ 202          }                                                                       
+ 203          
+ 204          void main()
+ 205          {
+ 206   1          char scroll_count = 0;
+ 207   1      
+ 208   1      INIT_START:
+ 209   1          //P0M0 = 0;
+ 210   1          //P0M1 = 0;
+ 211   1      
+ 212   1          close_led();
+ 213   1          init_timer_and_state();
+ 214   1          init_hardware();
+ 215   1      
+ 216   1          g_saved_count_time = IapRead(0x400);
+ 217   1      
+ 218   1          if(g_saved_count_time > 99) g_saved_count_time = 0;
+ 219   1          g_timer_to_count_min = g_saved_count_time;
+ 220   1          send_buffer("saved time:"); send_integ(g_saved_count_time);
+ 221   1          update_sec(g_timer_to_count_sec);
+ 222   1          update_min(g_timer_to_count_min);
+ 223   1          g_refresh_battery_icon_start = e_timer_start; 
+ 224   1          #ifdef TEST
+                  g_1s_test_timer = e_timer_start;     ds1302_start();      // test only 
+                  #endif
+ 227   1          while(1)
+ 228   1          {   
+ 229   2              calc_time();  
+ 230   2              #ifdef TEST
+                          if(e_timer_finished == g_1s_test_timer){ ds1302_read_sec(); g_1s_test_timer = e_timer_start;} 
+             -    //test only
+                      #endif
+ 233   2              {       
+ 234   3                  scan_roll(e_roll_a); 
+ 235   3                  process_key();
+ 236   3                  {
+ 237   4                      scroll_count = 0;
+C51 COMPILER V9.01   STOPWATCH                                                             12/20/2018 20:23:40 PAGE 5   
+
+ 238   4                      if(g_plus_count[e_roll_a] && e_timer_stop == g_100ms_timer)
+ 239   4                      {
+ 240   5                          g_100ms_timer = e_timer_start;         //trigger 100ms timer
+ 241   5                      }
+ 242   4                      if(e_timer_finished == g_100ms_timer)       //1 means 100ms count up 
+ 243   4                      {     
+ 244   5                          g_100ms_timer = e_timer_stop;
+ 245   5                          scroll_count  = g_plus_count[e_roll_a];
+ 246   5                          g_plus_count[e_roll_a] = 0;
+ 247   5                      }
+ 248   4                  } 
+ 249   3              }              
+ 250   2              if(0 == g_key_pressing_1s && 0 == g_key_released && 0 == g_key_pressed && e_idle == g_sys_state &&
+             - 0 == g_plus_count[e_roll_a] && 0 == scroll_count)//没有案件按下,也没有按键释放. 开始计时.5分钟
+ 251   2              {
+ 252   3                  if(e_timer_finished == g_1min_sys_idle_timer)
+ 253   3                  {
+ 254   4                      g_sys_idle_time_1min++; 
+ 255   4                      g_1min_sys_idle_timer= e_timer_start;
+ 256   4                  }
+ 257   3                  else if(e_timer_stop == g_1min_sys_idle_timer)
+ 258   3                  {
+ 259   4                      g_1min_sys_idle_timer = e_timer_start;
+ 260   4                  }
+ 261   3              }
+ 262   2              else
+ 263   2              {    
+ 264   3                  g_sys_idle_time_1min = 0;
+ 265   3                  g_1min_sys_idle_timer = e_timer_stop;
+ 266   3              }                                        
+ 267   2            
+ 268   2              if(e_idle == g_sys_state)poll_voltage();
+ 269   2      
+ 270   2              if(g_key_pressing_1s >= 3 || g_sys_idle_time_1min >= 1)
+ 271   2              {     
+ 272   3                 
+ 273   3                  if(IapRead(0x400) != g_saved_count_time) 
+ 274   3                  {
+ 275   4                      IapWrite(0x400, g_saved_count_time);
+ 276   4                  }
+ 277   3                  VOCTRL = 0;         // 选择内部静态保持电流控制线路,静态电流 1.5uA
+ 278   3                   //VOCTRL = 0x80;    // 选择外部静态保持电流控制线路,电流小于 0.1uA
+ 279   3                  P_SW2 = 0; //IT2 = 0;    //下降沿中断 
+ 280   3                  IE2 = ES2;  //EX0 = 1;//使能中断 
+ 281   3                  black_display();
+ 282   3                  close_display();
+ 283   3                              close_led();
+ 284   3                  disable_voltage_read();
+ 285   3                  //pcon |=0x1; //MCU idle
+ 286   3                  while(0 == g_key_state)Delay(199);
+ 287   3                  send_buffer("goto sleep, keypressing"); send_integ(g_key_state);
+ 288   3                  EA = 1;
+ 289   3                  PCON = 0x02; //MCU sleep
+ 290   3                  g_wakeup_from_sleep_flag=1; 
+ 291   3                  while(0 == g_key_state)Delay(199);
+ 292   3                  goto INIT_START;
+ 293   3              }//g_sys_state=   e_test ;
+ 294   2              switch(g_sys_state)
+ 295   2              {
+ 296   3                  case e_idle:  
+ 297   3                      if     (scroll_count> 10){scroll_count += 12;}
+ 298   3                      else if(scroll_count<-10){scroll_count -= 12;}                     
+C51 COMPILER V9.01   STOPWATCH                                                             12/20/2018 20:23:40 PAGE 6   
+
+ 299   3                      else if(scroll_count> 9 ){scroll_count += 10;}
+ 300   3                      else if(scroll_count<-9 ){scroll_count -= 10;}
+ 301   3                      else if(scroll_count> 6 ){scroll_count += 4 ;}
+ 302   3                      else if(scroll_count<-6 ){scroll_count -= 4 ;}
+ 303   3                      g_timer_to_count_min += scroll_count;
+ 304   3                      if(scroll_count!=0)
+ 305   3                      {
+ 306   4      
+ 307   4                          if(g_timer_to_count_min > 99) g_timer_to_count_min -= 100;
+ 308   4                          if(g_timer_to_count_min < 0) g_timer_to_count_min = 100 + g_timer_to_count_min;
+ 309   4                          if(g_saved_count_time != g_timer_to_count_min)
+ 310   4                          {
+ 311   5                              send_integ(g_timer_to_count_min); 
+ 312   5                              g_saved_count_time = g_timer_to_count_min;
+ 313   5                          }
+ 314   4                          update_min(g_timer_to_count_min);
+ 315   4                      }
+ 316   3                      if(g_key_pressed)
+ 317   3                      { 
+ 318   4                          ds1302_start();        
+ 319   4                          //send_buffer("rxn!");   
+ 320   4                          if(IapRead(0x400) != g_saved_count_time)
+ 321   4                          {
+ 322   5                              IapWrite(0x400, g_timer_to_count_min); g_saved_count_time = g_timer_to_count_min;
+ 323   5                          }
+ 324   4                          g_100ms_timer = e_timer_stop;// cancel poll scroll
+ 325   4                          //if(g_timer_to_count_min>99) g_timer_to_count_min -= 99;
+ 326   4                          //if(g_timer_to_count_min<0) g_timer_to_count_min = 100 +    g_timer_to_count_min;
+ 327   4                          
+ 328   4                          g_sys_state = e_count_down;
+ 329   4                          if(0 == g_timer_to_count_min)   
+ 330   4                          {            
+ 331   5                              //g_poll_ds1302_timer = 900;//begin to poll ds1302 for 1s
+ 332   5                              g_sys_state = e_count_up;
+ 333   5                          }
+ 334   4       
+ 335   4                          //send_int(g_timer_to_count_min);//debug use  
+ 336   4                          g_poll_ds1302_timer = 940;   //begin to poll ds1302 for 1s
+ 337   4                          g_poll_ds1302_timer_start = e_timer_start;
+ 338   4                                              start_breath_blink();// info user counter is running
+ 339   4                      }
+ 340   3                  break;
+ 341   3                  case e_count_up:
+ 342   3                      if(e_timer_finished == g_poll_ds1302_timer_start)
+ 343   3                      {
+ 344   4                          if( ds1302_1s_trigger())
+ 345   4                          {
+ 346   5                              g_poll_ds1302_timer_start = e_timer_start;
+ 347   5                              g_poll_ds1302_timer = 990; 
+ 348   5                              if(1 == g_paused)
+ 349   5                              break;
+ 350   5                              g_timer_to_count_sec++;
+ 351   5                              if(g_timer_to_count_sec == 60)
+ 352   5                              {
+ 353   6                                  g_timer_to_count_min++;
+ 354   6                                  g_timer_to_count_sec = 0;  
+ 355   6                                  if(g_timer_to_count_min ==  100)
+ 356   6                                      g_timer_to_count_min = 0; 
+ 357   6                                  update_min(g_timer_to_count_min);
+ 358   6                              }
+ 359   5                              update_sec(g_timer_to_count_sec);
+ 360   5                              {
+C51 COMPILER V9.01   STOPWATCH                                                             12/20/2018 20:23:40 PAGE 7   
+
+ 361   6                                  send_integ(g_timer_to_count_min);    //debug use
+ 362   6                                  send_integ(g_timer_to_count_sec);    //debug use
+ 363   6                              }
+ 364   5                          }
+ 365   4                          else
+ 366   4                          {
+ 367   5                              g_poll_ds1302_timer_start = e_timer_start;
+ 368   5                              g_poll_ds1302_timer = 5; 
+ 369   5                          }
+ 370   4      
+ 371   4                      }
+ 372   3                      if(g_key_pressed)//pause
+ 373   3                      {
+ 374   4                          g_paused = !g_paused;
+ 375   4                                              //if(!g_paused)start_breath_blink();// info user counter is runnin
+ 376   4                                              //else close_led();
+ 377   4                      } 
+ 378   3                      if(scroll_count >=5 || scroll_count<=-5)
+ 379   3                      {
+ 380   4                          g_poll_ds1302_timer_start = e_timer_stop;
+ 381   4                          g_sys_state = e_temp;
+ 382   4                          ds1302_stop();
+ 383   4                          g_timer_to_count_min = 0;
+ 384   4                          g_timer_to_count_sec = 0;  update_min(g_timer_to_count_min); update_sec(g_timer_to_cou
+             -nt_sec);
+ 385   4                      }
+ 386   3                  break;
+ 387   3                  case e_count_down:
+ 388   3                  {         
+ 389   4                      if(g_poll_ds1302_timer_start == e_timer_finished)
+ 390   4                      {        
+ 391   5                          if(ds1302_1s_trigger())
+ 392   5                          {
+ 393   6                               g_poll_ds1302_timer_start = e_timer_start;
+ 394   6                               g_poll_ds1302_timer = 990; 
+ 395   6                               if(1 == g_paused)
+ 396   6                               break;
+ 397   6                               if(g_timer_to_count_sec)
+ 398   6                               {
+ 399   7                                   g_timer_to_count_sec --;
+ 400   7                                                           
+ 401   7                               }
+ 402   6                               else                              
+ 403   6                               {
+ 404   7                                   g_timer_to_count_sec = 59;
+ 405   7                                   g_timer_to_count_min --;
+ 406   7                                                               update_min(g_timer_to_count_min);
+ 407   7                               }
+ 408   6                                                       update_sec(g_timer_to_count_sec);
+ 409   6                               {
+ 410   7                                  send_integ(g_timer_to_count_min);    //debug use
+ 411   7                                  send_integ(g_timer_to_count_sec);    //debug use
+ 412   7                               }
+ 413   6                               if((g_timer_to_count_sec+g_timer_to_count_min) == 0)
+ 414   6                               {
+ 415   7                                  g_poll_ds1302_timer = e_stop; ds1302_stop();
+ 416   7                                  g_sys_state = e_finished_alarm;
+ 417   7                                  //set_HZ(17.23);
+ 418   7                                                              set_HZ(2000);
+ 419   7                                      set_duty(10);
+ 420   7                                  //start_alarm();
+ 421   7                                                              start_alarm_blink();
+C51 COMPILER V9.01   STOPWATCH                                                             12/20/2018 20:23:40 PAGE 8   
+
+ 422   7                                  g_alarm_timeout_timer = e_timer_start; 
+ 423   7                                   
+ 424   7                                  g_blink_led_counter =  BLINK_OFF_MS;
+ 425   7                                  g_blink_off_flag = 1; 
+ 426   7                                  g_blink_function_start = e_timer_start;
+ 427   7                              }    
+ 428   6                          }
+ 429   5                          else
+ 430   5                          {
+ 431   6                              g_poll_ds1302_timer_start = e_timer_start;
+ 432   6                              g_poll_ds1302_timer = 10;       //every 5ms goto check wether the 1s timer is trig
+             -gered
+ 433   6                              break;
+ 434   6                          }
+ 435   5                      }    
+ 436   4                      if(g_key_pressed)//pause
+ 437   4                      {
+ 438   5                          g_paused = !g_paused;
+ 439   5                                          //if(!g_paused)start_breath_blink();// info user counter is runnin
+ 440   5                                              //else close_led();
+ 441   5                      }  
+ 442   4                      if(scroll_count >=5 || scroll_count<=-5)
+ 443   4                      {
+ 444   5                          g_poll_ds1302_timer_start = e_timer_stop;
+ 445   5                          g_timer_to_count_min = g_saved_count_time;
+ 446   5                          g_timer_to_count_sec = 0;
+ 447   5                          g_sys_state = e_temp;        update_min(g_timer_to_count_min); update_sec(g_timer_to_count_s
+             -ec);
+ 448   5                      }      
+ 449   4                  }
+ 450   3                  break;
+ 451   3                  case e_finished_alarm:
+ 452   3                  {  
+ 453   4                      //set_HZ(16.39);
+ 454   4                      if(g_alarm_timeout_timer == e_timer_finished ||g_key_released||scroll_count||g_plus_count[
+             -e_roll_a])
+ 455   4                      {
+ 456   5                          stop_alarm();close_led();
+ 457   5                          g_blink_function_start = e_timer_stop; g_blink_off_flag = 0;
+ 458   5                          g_alarm_timeout_timer = e_timer_stop;
+ 459   5                          send_buffer("goto idle");
+ 460   5                          g_timer_to_count_min = g_saved_count_time;
+ 461   5                          g_timer_to_count_sec = 0;
+ 462   5                          g_sys_state = e_idle;
+ 463   5                          g_plus_count[e_roll_a] = 0;
+ 464   5                                              update_min(g_timer_to_count_min); update_sec(g_timer_to_count_sec);
+ 465   5                      }
+ 466   4                   }
+ 467   3                  break;
+ 468   3                  case e_temp:
+ 469   3                  if(0 == scroll_count)
+ 470   3                  g_sys_state = e_idle;
+ 471   3                  break;
+ 472   3                              #if 0
+                                      case e_test:
+                                              {
+                                      static bit stat = 0;
+                                      static int hz = 17.23;
+                                      if(stat ==0 && g_key_pressed)
+                                      {
+                                              //set_HZ(17.23);
+                                              stat =1;
+C51 COMPILER V9.01   STOPWATCH                                                             12/20/2018 20:23:40 PAGE 9   
+
+                                          set_HZ(hz);
+                              //set_duty(1000);
+                              start_alarm();
+                                              update_min(hz/100);
+                                              update_sec(hz%100);
+                                      }
+                                      else if(1 == stat && g_key_pressed)
+                                      {
+                                              stop_alarm();close_led();
+                                      }
+                                      if(1 == stat)
+                                      {
+                                              update_blink_flash_led();
+                                      }
+                                      if(scroll_count)
+                                      {
+                                          if     (scroll_count> 10){scroll_count += 12;}
+                              else if(scroll_count<-10){scroll_count -= 12;}                     
+                              else if(scroll_count> 9 ){scroll_count += 10;}
+                              else if(scroll_count<-9 ){scroll_count -= 10;}
+                              else if(scroll_count> 6 ){scroll_count += 4 ;}
+                              else if(scroll_count<-6 ){scroll_count -= 4 ;}
+                                              hz+=scroll_count*100;
+                                          update_min(hz/100);
+                                              update_sec(hz%100);
+                                              set_HZ(hz);
+                                      }
+                                      
+                                       }
+                                      break;
+                                      #endif
+ 512   3              }
+ 513   2              scroll_count = 0;
+ 514   2            }
+ 515   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   2187    ----
+   CONSTANT SIZE    =     59    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =     37       1
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =      4    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

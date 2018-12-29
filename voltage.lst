@@ -1,0 +1,126 @@
+C51 COMPILER V9.01   VOLTAGE                                                               12/20/2018 20:23:43 PAGE 1   
+
+
+C51 COMPILER V9.01, COMPILATION OF MODULE VOLTAGE
+OBJECT MODULE PLACED IN voltage.obj
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE src\voltage.c COMPACT BROWSE PRINT(.\voltage.lst) OBJECT(voltage.obj)
+
+line level    source
+
+   1          #include "../h/port.h"  
+   2          #if 0      
+              #define ENLVR           0x40                    //RSTCFG.6
+              #define LVD2V2          0x00                    //LVD@2.0V
+              #define LVD2V4          0x01                    //LVD@2.4V
+              #define LVD2V7          0x02                    //LVD@2.7V
+              #define LVD3V0          0x03                    //LVD@3.0V
+              #define LVDF            0x20                    //PCON.5
+              int volatile g_low_voltage = 0;
+              void Lvd_Isr() interrupt 6 using 1
+              {
+                  PCON &= ~LVDF;                              //清中断标志
+                  //P32 = ~P32;                               //测试端口
+                  g_low_voltage ++;
+                  ELVD = 1;
+                  if(g_low_voltage>=100)ELVD = 0;
+              }
+              void init_low_power_inter()
+              {
+                  return;
+                  PCON &= ~LVDF;                              //测试端口
+              //  RSTCFG = ENLVR | LVD3V0;                    //使能3.0V时低压复位,不产生LVD中断
+                  RSTCFG = LVD2V7;                            //使能3.0V时低压中断
+                  ELVD = 1;                                   //使能LVD中断
+                  EA = 1;
+              }    
+              #endif
+  28          sbit g_3_6v_sw1  = P3^4;
+  29          sbit g_3_8v_sw2  = P3^3;
+  30          sbit g_4_0v_sw3  = P3^5;
+  31          sbit g_ad_enable = P3^6;     
+  32          void enable_voltage_read_init()
+  33          {
+  34   1          //IO 初始化为开漏模式
+  35   1          P3M1 |= 0x38; P3M0 |= 0x38;
+  36   1          //IO 输出高
+  37   1          g_3_6v_sw1 = g_3_8v_sw2 = g_4_0v_sw3 = 1;
+  38   1      
+  39   1          CMPCR2 = 0x10;    //比较起结果经过16个去抖动始终后输出 
+  40   1          CMPCR1 = 0;
+  41   1          CMPCR1 &= ~0x08;  //p37为CMP+输入脚
+  42   1          CMPCR1 &= ~0x04;  //内部参考电压为CMP- 输入脚
+  43   1          CMPCR1 &= ~0x02;  //禁止比较器结果输出
+  44   1          CMPCR1 |= 0x80;   //使能比较起模块
+  45   1          g_ad_enable = 0;
+  46   1      }
+  47          void disable_voltage_read()
+  48          {
+  49   1          CMPCR1 &= ~0x80;  //禁止比较起模块
+  50   1      }
+  51           
+  52          char get_voltage()
+  53          {
+  54   1          static vol = 0;
+  55   1          static comp_stage = 1;
+C51 COMPILER V9.01   VOLTAGE                                                               12/20/2018 20:23:43 PAGE 2   
+
+  56   1          switch(comp_stage)
+  57   1          {
+  58   2              case 0:
+  59   2              vol = 0;
+  60   2              //P20// P2.0 输出 0     3.6
+  61   2              g_3_6v_sw1 = 0;
+  62   2              comp_stage++;
+  63   2              break;
+  64   2              case 1:
+  65   2              if(!(CMPCR1 & 0x1)){ g_3_6v_sw1 = 1;comp_stage = 6; break;} 
+  66   2              comp_stage++;
+  67   2              g_3_6v_sw1 = 1;
+  68   2              break;
+  69   2      
+  70   2              case 2:
+  71   2              vol = 1;
+  72   2              //P21//  P21 输出0         3.8
+  73   2              g_3_8v_sw2 = 0;
+  74   2              comp_stage++;
+  75   2              break;
+  76   2              case 3:
+  77   2              if(!(CMPCR1 & 0x1)){g_3_8v_sw2 = 1; comp_stage = 6; break;} 
+  78   2              comp_stage++;
+  79   2              g_3_8v_sw2 = 1;
+  80   2              break;
+  81   2      
+  82   2              case 4:
+  83   2              vol = 2;     //      4.0
+  84   2              //P21//  P21 输出0
+  85   2              g_4_0v_sw3 = 0;
+  86   2              comp_stage++;
+  87   2              break;
+  88   2              case 5:
+  89   2              if(!(CMPCR1 & 0x1)){g_4_0v_sw3 = 1; comp_stage = 6; break;} 
+  90   2              comp_stage++; vol = 3; 
+  91   2              g_4_0v_sw3 = 1;
+  92   2              break;
+  93   2           }
+  94   1          if(comp_stage == 6)
+  95   1          {
+  96   2              comp_stage = 0;
+  97   2              g_ad_enable = 0;
+  98   2              return vol;
+  99   2          }
+ 100   1          else return -1;
+ 101   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    230    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =      4    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)
