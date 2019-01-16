@@ -27,7 +27,7 @@ enum phase_sub_status
     e_count,
     e_countend,
 };
- 
+extern void stop_scroll(void); 
 extern char g_plus_count[e_roll_max];
 extern void init_scroll();
 extern void scan_roll(char);

@@ -136,7 +136,7 @@ void init_hardware(void)
 	#ifdef KEY_INTERRUPT_
 	init_key();
 	#endif
-    enable_voltage_read_init();
+	enable_voltage_read_init();
     serial_port_init        ();  
     init_timer ();
     ds1302_init();
@@ -160,8 +160,9 @@ void init_hardware(void)
     g_timer_to_count_sec = 0;                     \
     g_key_released = 0; g_key_pressed = 0;        \ 
     g_key_pressing_1s = 0; g_paused = 0;          \
-    g_poll_voltage_timer_interval = 0;            \
+    g_poll_voltage_timer_interval = 10;            \
     g_1min_poll_battery_timer = e_timer_finished; \
+	g_refresh_battery_icon_start = e_timer_stop; g_battery = g_battery_display = 0; \
 }
 
 bit g_wakeup_from_sleep_flag = 0;
@@ -169,28 +170,12 @@ bit g_wakeup_from_sleep_flag = 0;
 uchar g_battery = 0;
 uchar g_battery_display = 0;
 void poll_voltage()                                                 
-{                                                                   
-    if(e_timer_finished == g_1min_poll_battery_timer)               
-    {                                                               
-        g_poll_voltage_timer_interval++;                            
-        g_1min_poll_battery_timer= e_timer_start;                   
-    }                                                               
-    else if(e_timer_stop == g_1min_poll_battery_timer)              
-    {                                                               
-        g_1min_poll_battery_timer = e_timer_start;                  
-    }                                                               
-    if(g_poll_voltage_timer_interval <5) return;                    
-	    g_battery = get_voltage();                                  
-    if(-1 == g_battery){ return; }                                  
-    g_poll_voltage_timer_interval = 0;                              
-	send_buffer("vol");send_integ(g_battery);
+{   
     if(g_battery == 0)                                              
     {                                                               
-        send_buffer("low voltage!");                                
         if(g_refresh_battery_icon_start == e_timer_stop)            
         {                                                           
             g_refresh_battery_icon_start = e_timer_start;           
-            g_battery_display = 1;                                  
         }                                                           
         else if( e_timer_finished == g_refresh_battery_icon_start)  
         {                                                           
@@ -199,8 +184,24 @@ void poll_voltage()
             update_min(g_timer_to_count_min);			
             g_refresh_battery_icon_start = e_timer_start;           
         }                                                           
+    }                                                                
+    if(e_timer_finished == g_1min_poll_battery_timer)               
+    {                                                               
+        g_poll_voltage_timer_interval++;                            
+        g_1min_poll_battery_timer= e_timer_start;                   
     }                                                               
-    else if(g_battery > 0)                                          
+    else if(e_timer_stop == g_1min_poll_battery_timer)              
+    {                                                               
+        g_1min_poll_battery_timer = e_timer_start;                  
+    }      
+	                                                         
+    if(g_poll_voltage_timer_interval <10) return;                    
+    g_battery = get_voltage();                                  
+    if(-1 == g_battery){ return; }                                  
+    g_poll_voltage_timer_interval = 0;                              
+	send_buffer("vol");send_integ(g_battery);
+                                                               
+    if(g_battery > 0)                                          
     {                                                               
         if(g_battery_display!= g_battery)							
 		{
@@ -214,11 +215,10 @@ void poll_voltage()
 void main()
 {
     char scroll_count = 0;
-
+	close_rgb_led();
 INIT_START:
     //P0M0 = 0;
     //P0M1 = 0;
-
     close_rgb_led();
     init_timer_and_state();
     init_hardware();
@@ -278,28 +278,31 @@ INIT_START:
       
         if(e_idle == g_sys_state)poll_voltage();
 
-        if(g_key_pressing_1s >= 3 || g_sys_idle_time_1min >= 100)
+        if(g_key_pressing_1s >= 3 || g_sys_idle_time_1min >= 1)
         {     
            
             if(IapRead(0x400) != g_saved_count_time) 
             {
                 IapWrite(0x400, g_saved_count_time);
             }
-            VOCTRL = 0;         // 选择内部静态保持电流控制线路,静态电流 1.5uA
-            //VOCTRL = 0x80;    // 选择外部静态保持电流控制线路,电流小于 0.1uA
+            VOCTRL = 0;            // 选择内部静态保持电流控制线路,静态电流 1.5uA
+            // VOCTRL = 0x80;           // 选择外部静态保持电流控制线路,电流小于 0.1uA
             P_SW2 = 0; //IT2 = 0;    //下降沿中断 
-            IE2 = ES2;  //EX0 = 1;//使能中断 
+            IE2 = ES2;  //EX0 = 1;   //使能中断 
             black_display();
             close_display();
             close_rgb_led();
             disable_voltage_read();
+				  stop_sys_timer();
+           		     stop_scroll();
+			     ds1302_shutdown();
+					  stop_alarm();
             //pcon |=0x1; //MCU idle
-            while(0 == g_key_state)Delay(199);
+            while(0 == g_key_state)Delay(799);
             send_buffer("goto sleep, keypressing"); send_integ(g_key_state);
-            EA = 1;
             PCON = 0x02; //MCU sleep
             g_wakeup_from_sleep_flag=1; 
-            while(0 == g_key_state)Delay(199);
+		    while(0 == g_key_state)Delay(799);
             goto INIT_START;
         }//g_sys_state=      e_test ;
         switch(g_sys_state)
@@ -426,8 +429,8 @@ INIT_START:
                             g_poll_ds1302_timer = e_stop; ds1302_stop();
                             g_sys_state = e_finished_alarm;
                             //set_HZ(17.23);
-                            set_HZ(2000);
-                            set_duty(10);
+                            set_HZ(5000);
+                            set_duty(50);
                             //start_alarm();
                             start_alarm_blink();
                             g_alarm_timeout_timer = e_timer_start; 

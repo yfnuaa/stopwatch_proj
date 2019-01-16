@@ -15,8 +15,19 @@ char g_plus_b_in_old[e_roll_max] = {high};
 char g_plus_count[ e_roll_max] = {0};    
 #if 1                                                                            
 uchar g_juggle_delay = 0;
+#define A_IN_hight_input   P1M1 |= 0x02; P1M0 &= ~0x02;//P16  //P2M1 |= 0x80; P2M0 &= ~0x80; //P27 //1 0 高阻输入
+#define B_IN_hight_input   P1M1 |= 0x04; P1M0 &= ~0x04;//P16  //P2M1 |= 0x80; P2M0 &= ~0x80; //P27 //1 0 高阻输入
+#define A_IN_normal  P1M1 &= ~0x02;   P1M0 &= ~0x02; //P16 //P2M1 &= ~0x80;   P2M0 &= ~0x80;  //P27  //0 0 准双向口
+#define B_IN_normal  P1M1 &= ~0x04;   P1M0 &= ~0x04; //P16 //P2M1 &= ~0x80;   P2M0 &= ~0x80;  //P27  //0 0 准双向口
+
+void stop_scroll(void)
+{
+//B_IN_hight_input ;  A_IN_hight_input ;
+PLUS_0_B_IN = PLUS_0_A_IN = 0;
+}
 void init_scroll()
 {
+A_IN_normal ;B_IN_normal;  PLUS_0_B_IN =PLUS_0_A_IN = 1;
     g_plus_a_in[0] = high;
     g_plus_b_in[0] = high;
     g_plus_a_in_old[0] =high;

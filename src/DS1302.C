@@ -12,7 +12,9 @@
 **************************************/
 #include "../h/port.h"
 #include "../h/serial.h"
-//sbit g_1302_vcc = P3^1;
+#define ON  0
+#define OFF 1
+sbit g_1302_vcc = P3^0;
 sbit SCLK = P1^3;                   //DS1302时钟口P1.0
 sbit IO   = P1^4;                     //DS1302数据口P1.1
 sbit RST   =P1^5;                    //DS1302片选口P1.2
@@ -120,16 +122,21 @@ uchar ds1302_read_sec( )
 }
 #endif
 void ds1302_stop()
-{
-    //DS1302_WriteData(0x8e, 0x00);   //允许写操作
-    //DS1302_WriteData(0x80, 0x80);
-    //DS1302_WriteData(0x8e, 0x80);   //写保护
-    //g_1302_vcc = 0;
+{				
+   // RST =  SCLK  =IO=0;
+    DS1302_WriteData(0x8e, 0x00);   //允许写操作
+    DS1302_WriteData(0x80, 0x80);
+    DS1302_WriteData(0x8e, 0x80);   //写保护
+   // g_1302_vcc = OFF;
 }  
+void ds1302_shutdown()
+{
+    g_1302_vcc = OFF;
+}
 uchar volatile g_ds1302_1s = 0;
 void ds1302_start()
 {   
-  //  g_1302_vcc = 1;
+    g_1302_vcc = ON; 
     g_ds1302_1s = 0;
     DS1302_WriteData(0x8e, 0x00);   //允许写操作
     DS1302_WriteData(0x80, 0x01);
@@ -175,7 +182,9 @@ void DS1302_SetTime(uchar *p)
 初始化DS1302
 **************************************/
 void ds1302_init()
-{
+{	     
+    g_1302_vcc = ON; 
+	 _nop_(); _nop_();
     RST = 0;
     SCLK = 0;                      
     //DS1302_WriteData(0x8e, 0x00);   //允许写操作

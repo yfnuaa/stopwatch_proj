@@ -8,12 +8,14 @@ uchar volatile g_HZ_H_duty_l = 0;
 uchar volatile g_HZ_L_duty_l = 0; 
 sbit g_buzzer = P3^2;
 char g_duty = 50;
+#define ON 1
+#define OFF 0
 void Time1(void) interrupt 12  //“interrupt”声明函数为中断服务函数
 //其后的1 为定时器T0 的中断编号；0 表示使用第0 组工作
 {       
     AUXINTIF &= ~T2IF;                          //清中断标志
     g_buzzer = ~g_buzzer;
-    if(!g_buzzer)
+    if(ON == g_buzzer)
     {
         T2H = g_HZ_H_duty_h;
         T2L = g_HZ_L_duty_h; 
@@ -28,8 +30,8 @@ void Time1(void) interrupt 12  //“interrupt”声明函数为中断服务函数
 }
 void init_timer2(void)
 {
-    T2L = g_HZ_L_duty_h;   //65536-11.0592M/12/1000
-    T2H = g_HZ_H_duty_h;   
+    T2L = g_HZ_L_duty_l;   //65536-11.0592M/12/1000
+    T2H = g_HZ_H_duty_l;   
     // AUXR &= 0xFB;       //1/12 T
     AUXR |= 0x04;           //Timer clock is 1T mode
     AUXR |= 0x10;          //启动定时器
@@ -58,7 +60,7 @@ void init_pwm()
 #endif
 void set_duty(char duty)
 {
-    if(duty<100 && duty>0) g_duty = duty; 
+   g_duty = duty; 
 }
 #ifdef SYS_HZ_4M
 #define SYS_HZ 4000000
@@ -69,19 +71,21 @@ void set_duty(char duty)
 #endif
 //#define SYS_HZ_6M
 //#define SYS_HZ_27M
-void set_HZxx(float HZ)
+#if 0
+void set_HZ(float HZ)
 {
     unsigned int temp;
     unsigned int duty;
-    temp = 65536 - SYS_HZ/HZ;       //2000000/(HZ>>1);
+    temp = 65536 - SYS_HZ/2/HZ;       //2000000/(HZ>>1);
        
     g_HZ_L_duty_l = g_HZ_L_duty_h = temp&0xFF;
     g_HZ_H_duty_l = g_HZ_H_duty_h = temp>>8;     
 }
+#else
 void set_HZ(float HZ)
 {
     u32 temp = 0;
-    u8  duty = 0;
+    u32  duty = 0;
     temp = SYS_HZ/HZ;
 
     duty = temp*g_duty/100;        //duty high part
@@ -96,20 +100,27 @@ void set_HZ(float HZ)
     g_HZ_L_duty_l = duty&0xFF;
     g_HZ_H_duty_l = duty>>8;    
 }
+#endif
+#define buzzer_pin_normal  P3M1 &= ~0x04;   P3M0 &= ~0x04; //P16 //P2M1 &= ~0x80;   P2M0 &= ~0x80;  //P27  //0 0 准双向口
+#define buzzer_pin_high_output  P3M1 &= ~0x04; P3M0 |= 0x04; //P16  //P2M1 &= ~0x80; P2M0 |= 0x80; //P27   //0 1 推挽输出
+
 void start_alarm()
-{
+{	
+   // buzzer_pin_high_output;
     init_timer2();
 }
+
 void stop_alarm()
 {
     AUXR &= 0xEF;                    //停止定时器
     //IE2 = IE2&(~ET2);
-    g_buzzer = 1;
+//	buzzer_pin_normal;
+    g_buzzer = OFF;
 }
 
 //----------------------------blink LED ----------------------------------
-#define ON  0
-#define OFF 1
+#define ON  1
+#define OFF 0
 sbit g_led_R_port = P0^3;
 sbit g_led_G_port = P0^2;
 sbit g_led_B_port = P0^1;
@@ -151,9 +162,9 @@ bit g_breath_led_on = 0;
 char g_breath_led_r_direction, g_breath_led_g_direction, g_breath_led_b_direction;
 void close_rgb_led()
 {
-    IE2 &= ~ET4;  // stop blink 
     g_led_R_port = g_led_G_port = g_led_B_port = OFF;
-    g_breath_led_on = 0;
+    g_breath_led_on = 0;     IE2 &= ~ET4;  // stop blink 
+
 }
 void poll_led_breath_1700us()
 {
@@ -253,7 +264,7 @@ void start_breath_blink()
     g_breath_led_b_direction = 3;
 //  g_led_timer_HL = 0xFFD8;  //10us  //0xFFD8  Tled= 1ms  1000 HZ
 //  g_led_timer_HL = 0xFFB0;  //20us  //0xFFB0  Tled= 2ms  500  HZ
-    g_led_timer_HL = 0xE570;// 0xE570;  //1.7ms  // Tled= 17ms  at 60HZ
+//    g_led_timer_HL = 0xE570;// 0xE570;  //1.7ms  // Tled= 17ms  at 60HZ
     Timer4Init_breath_1700us();
 }
 void start_alarm_blink()

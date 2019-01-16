@@ -1,4 +1,4 @@
-C51 COMPILER V9.01   LCD                                                                   12/20/2018 20:32:00 PAGE 1   
+C51 COMPILER V9.01   LCD                                                                   01/14/2019 21:22:36 PAGE 1   
 
 
 C51 COMPILER V9.01, COMPILATION OF MODULE LCD
@@ -62,7 +62,7 @@ line level    source
   52          #define com1_normal  P1M1 &= ~0x40;   P1M0 &= ~0x40; //P16 //P2M1 &= ~0x80;   P2M0 &= ~0x80;  //P27  //0 0
              - 准双向口
   53          #define com2_normal  P1M1 &= ~0x80;   P1M0 &= ~0x80; //P17 //P2M1 &= ~0x40;   P2M0 &= ~0x40;  //P26
-C51 COMPILER V9.01   LCD                                                                   12/20/2018 20:32:00 PAGE 2   
+C51 COMPILER V9.01   LCD                                                                   01/14/2019 21:22:36 PAGE 2   
 
   54          #define com3_normal  P5M1 &= ~0x10;   P5M0 &= ~0x10; //P54 //P2M1 &= ~0x20;   P2M0 &= ~0x20;  //P25
   55          #define com4_normal  P5M1 &= ~0x20;   P5M0 &= ~0x20; //P55 //P2M1 &= ~0x10;   P2M0 &= ~0x10;  //P24
@@ -126,7 +126,7 @@ line level    source
  112   2              P2 = ~g_com4_data; g_com4 = 1;    
  113   2              //P2 = 0xFF; g_com4 = 0;    
  114   2              com4_push_pull;
-C51 COMPILER V9.01   LCD                                                                   12/20/2018 20:32:00 PAGE 3   
+C51 COMPILER V9.01   LCD                                                                   01/14/2019 21:22:36 PAGE 3   
 
  115   2              break; 
  116   2              case 7:
@@ -163,105 +163,115 @@ line level    source
  147   1          IE2 = IE2|ET3;   //使能定时器中断
  148   1          T4T3M |= 0x08;   //启动定时器
  149   1          EA = 1;
- 150   1      }
- 151          void close_display()
- 152          {
- 153   1          T4T3M &= 0xF7;  //停止定时器3
- 154   1          P2=0;g_com1 = g_com2 = g_com3 = g_com4 =0;
- 155   1          com1_hight_input;com2_hight_input;com3_hight_input;com4_hight_input;//set all com high rissor
- 156   1      }
- 157          extern bit g_blink_off_flag;
- 158          void update_min(uchar min)
- 159          {
- 160   1          uchar min_code=0;
- 161   1       
- 162   1          if(g_blink_off_flag)return;
- 163   1          min = BCD_table[min];
- 164   1          min_code =  DIG_CODE[min >> 4];
- 165   1          g_com1_data &= 0x3F;//0xFC;
- 166   1              
- 167   1          g_com1_data |= (min_code&0x20)?0x80:0; //1F
- 168   1          g_com1_data |= (min_code&0x01)?0x40:0; //1A
- 169   1          g_com2_data &= 0x3F;
- 170   1          g_com2_data |= (min_code&0x40)?0x80:0; //1G
- 171   1          g_com2_data |= (min_code&0x02)?0x40:0; //1B
- 172   1          g_com3_data &= 0x3F;
- 173   1          g_com3_data |= (min_code&0x10)?0x80:0; //1E
- 174   1          g_com3_data |= (min_code&0x04)?0x40:0; //1C
- 175   1          g_com4_data &= 0x3F;
- 176   1          g_com4_data |= (min_code&0x08)?0x80:0; //1D
-C51 COMPILER V9.01   LCD                                                                   12/20/2018 20:32:00 PAGE 4   
+ 150   1      }   sbit g_key_state = P1^0;
+ 151          
+ 152          void close_display()
+ 153          {
+ 154   1          T4T3M &= 0xF7;  //停止定时器3
+ 155   1          com1_normal; com2_normal; com3_normal; com4_normal;
+ 156   1              g_com1 = g_com2 = g_com3 = g_com4 =0;
+ 157   1          P2=0;
+ 158   1              
+ 159   1              P1= 0;
+ 160   1              g_key_state = 1;
+ 161   1          P0 = 0;
+ 162   1              P3 = 0;
+ 163   1              P4 = 0;
+ 164   1              P5 = 0;
+ 165   1      
+ 166   1      }
+ 167          extern bit g_blink_off_flag;
+ 168          void update_min(uchar min)
+ 169          {
+ 170   1          uchar min_code=0;
+ 171   1       
+ 172   1          if(g_blink_off_flag)return;
+ 173   1          min = BCD_table[min];
+ 174   1          min_code =  DIG_CODE[min >> 4];
+ 175   1          g_com1_data &= 0x3F;//0xFC;
+ 176   1              
+C51 COMPILER V9.01   LCD                                                                   01/14/2019 21:22:36 PAGE 4   
 
- 177   1          if(3 == g_battery_display)g_com4_data |= 0x40; //S3
- 178   1          min_code =  DIG_CODE[(min&0xF)];
- 179   1          g_com1_data &= 0xCF;
- 180   1          g_com1_data |= (min_code&0x20)?0x20:0; //2F
- 181   1          g_com1_data |= (min_code&0x01)?0x10:0; //2A
- 182   1          g_com2_data &= 0xCF;
- 183   1          g_com2_data |= (min_code&0x40)?0x20:0; //2G
- 184   1          g_com2_data |= (min_code&0x02)?0x10:0; //2B
- 185   1          g_com3_data &= 0xCF;
- 186   1          g_com3_data |= (min_code&0x10)?0x20:0; //2E
- 187   1          g_com3_data |= (min_code&0x04)?0x10:0; //2C
- 188   1          g_com4_data &= 0xCF;
- 189   1          g_com4_data |= (min_code&0x08)?0x20:0; //2D
- 190   1          if(g_battery_display >= 2)g_com4_data |= 0x10; //S2
- 191   1      #if 0
+ 177   1          g_com1_data |= (min_code&0x20)?0x80:0; //1F
+ 178   1          g_com1_data |= (min_code&0x01)?0x40:0; //1A
+ 179   1          g_com2_data &= 0x3F;
+ 180   1          g_com2_data |= (min_code&0x40)?0x80:0; //1G
+ 181   1          g_com2_data |= (min_code&0x02)?0x40:0; //1B
+ 182   1          g_com3_data &= 0x3F;
+ 183   1          g_com3_data |= (min_code&0x10)?0x80:0; //1E
+ 184   1          g_com3_data |= (min_code&0x04)?0x40:0; //1C
+ 185   1          g_com4_data &= 0x3F;
+ 186   1          g_com4_data |= (min_code&0x08)?0x80:0; //1D
+ 187   1          if(3 == g_battery_display)g_com4_data |= 0x40; //S3
+ 188   1          min_code =  DIG_CODE[(min&0xF)];
+ 189   1          g_com1_data &= 0xCF;
+ 190   1          g_com1_data |= (min_code&0x20)?0x20:0; //2F
+ 191   1          g_com1_data |= (min_code&0x01)?0x10:0; //2A
+ 192   1          g_com2_data &= 0xCF;
+ 193   1          g_com2_data |= (min_code&0x40)?0x20:0; //2G
+ 194   1          g_com2_data |= (min_code&0x02)?0x10:0; //2B
+ 195   1          g_com3_data &= 0xCF;
+ 196   1          g_com3_data |= (min_code&0x10)?0x20:0; //2E
+ 197   1          g_com3_data |= (min_code&0x04)?0x10:0; //2C
+ 198   1          g_com4_data &= 0xCF;
+ 199   1          g_com4_data |= (min_code&0x08)?0x20:0; //2D
+ 200   1          if(g_battery_display >= 2)g_com4_data |= 0x10; //S2
+ 201   1      #if 0
                   g_com2_data = 0xff;
                   g_com3_data = 0;
                   g_com1_data = 0;
                   g_com4_data = 0;
               #endif    
- 197   1           
- 198   1      }
- 199          
- 200          void update_sec(uchar sec)
- 201          {    
- 202   1          uchar sec_code=0;//  return;
- 203   1          //  sec=11;
- 204   1          if(g_blink_off_flag)return;
- 205   1          sec = BCD_table[sec];
- 206   1      
- 207   1          sec_code =  DIG_CODE[sec >> 4];
- 208   1          g_com1_data &= 0xF3;
- 209   1          g_com1_data |= (sec_code&0x20)?0x08:0;  //3F
- 210   1          g_com1_data |= (sec_code&0x01)?0x04:0;  //3A
- 211   1          g_com2_data &= 0xF3;
- 212   1          g_com2_data |= (sec_code&0x40)?0x08:0;  //3G
- 213   1          g_com2_data |= (sec_code&0x02)?0x04:0;  //3B
- 214   1          g_com3_data &= 0xF3;
- 215   1          g_com3_data |= (sec_code&0x10)?0x08:0;  //3E
- 216   1          g_com3_data |= (sec_code&0x04)?0x04:0;  //3C 
- 217   1          g_com4_data &= 0xF3;
- 218   1          g_com4_data |= (sec_code&0x08)?0x08:0;  //3D
- 219   1          g_com4_data |=0x04;
- 220   1          //if(OPEN S4 )  g_com4_data = g_com4_data|(0x04);//S4
- 221   1      
- 222   1          sec_code = DIG_CODE[(sec&0xf)];
- 223   1          g_com1_data &= 0xFC;
- 224   1          g_com1_data |= (sec_code&0x20)?0x01:0;   //4F
- 225   1          g_com1_data |= (sec_code&0x01)?0x02:0;   //4A
- 226   1          g_com2_data &= 0xFC;
- 227   1          g_com2_data |= (sec_code&0x40)?0x01:0;   //4G
- 228   1          g_com2_data |= (sec_code&0x02)?0x02:0;   //4B
- 229   1          g_com3_data &= 0xFC;
- 230   1          g_com3_data |= (sec_code&0x10)?0x01:0;   //4E
- 231   1          g_com3_data |= (sec_code&0x04)?0x02:0;   //4C
- 232   1          g_com4_data &= 0xFC;
- 233   1          g_com4_data |= (sec_code&0x08)?0x01:0;   //4D
- 234   1          if(g_battery_display >= 1) g_com4_data |= 0x02;  //S1 
- 235   1      }
- 236          void black_display(void)
- 237          {
- 238   1          //set all com high rissor
-C51 COMPILER V9.01   LCD                                                                   12/20/2018 20:32:00 PAGE 5   
+ 207   1           
+ 208   1      }
+ 209          
+ 210          void update_sec(uchar sec)
+ 211          {    
+ 212   1          uchar sec_code=0;//  return;
+ 213   1          //  sec=11;
+ 214   1          if(g_blink_off_flag)return;
+ 215   1          sec = BCD_table[sec];
+ 216   1      
+ 217   1          sec_code =  DIG_CODE[sec >> 4];
+ 218   1          g_com1_data &= 0xF3;
+ 219   1          g_com1_data |= (sec_code&0x20)?0x08:0;  //3F
+ 220   1          g_com1_data |= (sec_code&0x01)?0x04:0;  //3A
+ 221   1          g_com2_data &= 0xF3;
+ 222   1          g_com2_data |= (sec_code&0x40)?0x08:0;  //3G
+ 223   1          g_com2_data |= (sec_code&0x02)?0x04:0;  //3B
+ 224   1          g_com3_data &= 0xF3;
+ 225   1          g_com3_data |= (sec_code&0x10)?0x08:0;  //3E
+ 226   1          g_com3_data |= (sec_code&0x04)?0x04:0;  //3C 
+ 227   1          g_com4_data &= 0xF3;
+ 228   1          g_com4_data |= (sec_code&0x08)?0x08:0;  //3D
+ 229   1          g_com4_data |=0x04;
+ 230   1          //if(OPEN S4 )  g_com4_data = g_com4_data|(0x04);//S4
+ 231   1      
+ 232   1          sec_code = DIG_CODE[(sec&0xf)];
+ 233   1          g_com1_data &= 0xFC;
+ 234   1          g_com1_data |= (sec_code&0x20)?0x01:0;   //4F
+ 235   1          g_com1_data |= (sec_code&0x01)?0x02:0;   //4A
+ 236   1          g_com2_data &= 0xFC;
+ 237   1          g_com2_data |= (sec_code&0x40)?0x01:0;   //4G
+ 238   1          g_com2_data |= (sec_code&0x02)?0x02:0;   //4B
+C51 COMPILER V9.01   LCD                                                                   01/14/2019 21:22:36 PAGE 5   
 
- 239   1          com1_hight_input;com2_hight_input;com3_hight_input;com4_hight_input;//set all com high rissor
- 240   1      }
+ 239   1          g_com3_data &= 0xFC;
+ 240   1          g_com3_data |= (sec_code&0x10)?0x01:0;   //4E
+ 241   1          g_com3_data |= (sec_code&0x04)?0x02:0;   //4C
+ 242   1          g_com4_data &= 0xFC;
+ 243   1          g_com4_data |= (sec_code&0x08)?0x01:0;   //4D
+ 244   1          if(g_battery_display >= 1) g_com4_data |= 0x02;  //S1 
+ 245   1      }
+ 246          void black_display(void)
+ 247          {
+ 248   1          //set all com high rissor
+ 249   1          com1_hight_input;com2_hight_input;com3_hight_input;com4_hight_input;//set all com high rissor
+ 250   1      }
 
 
 MODULE INFORMATION:   STATIC OVERLAYABLE
-   CODE SIZE        =   1011    ----
+   CODE SIZE        =   1023    ----
    CONSTANT SIZE    =   ----    ----
    XDATA SIZE       =   ----    ----
    PDATA SIZE       =    115    ----

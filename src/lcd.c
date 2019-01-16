@@ -147,12 +147,22 @@ void init_display(void)
     IE2 = IE2|ET3;   //使能定时器中断
     T4T3M |= 0x08;   //启动定时器
     EA = 1;
-}
+}   sbit g_key_state = P1^0;
+
 void close_display()
 {
     T4T3M &= 0xF7;  //停止定时器3
-    P2=0;g_com1 = g_com2 = g_com3 = g_com4 =0;
-    com1_hight_input;com2_hight_input;com3_hight_input;com4_hight_input;//set all com high rissor
+    com1_normal; com2_normal; com3_normal; com4_normal;
+	g_com1 = g_com2 = g_com3 = g_com4 =0;
+    P2=0;
+	
+	P1= 0;
+	g_key_state = 1;
+    P0 = 0;
+	P3 = 0;
+	P4 = 0;
+	P5 = 0;
+
 }
 extern bit g_blink_off_flag;
 void update_min(uchar min)

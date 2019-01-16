@@ -41,22 +41,25 @@ void enable_voltage_read_init()
     CMPCR1 &= ~0x08;  //p37为CMP+输入脚
     CMPCR1 &= ~0x04;  //内部参考电压为CMP- 输入脚
     CMPCR1 &= ~0x02;  //禁止比较器结果输出
-    CMPCR1 |= 0x80;   //使能比较起模块
-    g_ad_enable = 0;
+//    CMPCR1 |= 0x80;   //使能比较起模块
+//    g_ad_enable = 0;
 }
 void disable_voltage_read()
 {
     CMPCR1 &= ~0x80;  //禁止比较起模块
+	g_ad_enable = 1;
 }
  
 char get_voltage()
 {
     static vol = 0;
-    static comp_stage = 1;
+    static comp_stage = 0;
     switch(comp_stage)
     {
         case 0:
         vol = 0;
+		CMPCR1 |= 0x80;   //使能比较起模块
+        g_ad_enable = 0;
         //P20// P2.0 输出 0     3.6
         g_3_6v_sw1 = 0;
         comp_stage++;
@@ -94,7 +97,7 @@ char get_voltage()
     if(comp_stage == 6)
     {
         comp_stage = 0;
-        g_ad_enable = 0;
+        disable_voltage_read();
         return vol;
     }
     else return -1;

@@ -12,7 +12,7 @@ typedef  long          i32;
 
 //#define TEST
 
-#define ENABLE_SERIAL
+//#define ENABLE_SERIAL
 
 
 #define SYS_HZ_4M

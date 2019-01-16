@@ -1,4 +1,4 @@
-C51 COMPILER V9.01   DS1302                                                                12/20/2018 20:23:42 PAGE 1   
+C51 COMPILER V9.01   DS1302                                                                01/14/2019 21:22:35 PAGE 1   
 
 
 C51 COMPILER V9.01, COMPILATION OF MODULE DS1302
@@ -21,152 +21,159 @@ line level    source
   12          **************************************/
   13          #include "../h/port.h"
   14          #include "../h/serial.h"
-  15          sbit g_1302_vcc = P3^0;
-  16          sbit SCLK = P1^3;                   //DS1302时钟口P1.0
-  17          sbit IO   = P1^4;                     //DS1302数据口P1.1
-  18          sbit RST   =P1^5;                    //DS1302片选口P1.2
-  19            
-  20          void Delayxx()
-  21          {
-  22   1          _nop_();  //  _nop_(); _nop_();
-  23   1      }
-  24          
-  25          /**************************************
-  26          从DS1302读1字节数据
-  27          **************************************/
-  28          uchar DS1302_Readuchar()
-  29          {
-  30   1          uchar i = 0;
-  31   1          uchar dat = 0;
-  32   1          for (i=0; i<8; i++)             //8位计数器
-  33   1          {
-  34   2              SCLK = 0;                   //时钟线拉低
-  35   2              Delayxx();                    //延时等待
-  36   2      
-  37   2              dat >>= 1;                  //数据右移一位
-  38   2              if (IO) dat |= 0x80;        //读取数据
-  39   2              SCLK = 1;                   //时钟线拉高
-  40   2              Delayxx();                    //?óê±μè′y
-  41   2          }
-  42   1          return dat;
-  43   1      }
-  44          
-  45          /**************************************
-  46          向DS1302写1字节数据
-  47          **************************************/
-  48          void DS1302_Writeuchar(uchar dat)
-  49          {
-  50   1          char i = 0;
-  51   1          for (i=0; i<8; i++)             //8位计数器
-  52   1          {
-  53   2              SCLK = 0;                   //时钟线拉低
-  54   2              Delayxx();                    //延时等待
-  55   2              dat >>= 1;                  //移出数据
-C51 COMPILER V9.01   DS1302                                                                12/20/2018 20:23:42 PAGE 2   
+  15          #define ON  0
+  16          #define OFF 1
+  17          sbit g_1302_vcc = P3^0;
+  18          sbit SCLK = P1^3;                   //DS1302时钟口P1.0
+  19          sbit IO   = P1^4;                     //DS1302数据口P1.1
+  20          sbit RST   =P1^5;                    //DS1302片选口P1.2
+  21            
+  22          void Delayxx()
+  23          {
+  24   1          _nop_();  //  _nop_(); _nop_();
+  25   1      }
+  26          
+  27          /**************************************
+  28          从DS1302读1字节数据
+  29          **************************************/
+  30          uchar DS1302_Readuchar()
+  31          {
+  32   1          uchar i = 0;
+  33   1          uchar dat = 0;
+  34   1          for (i=0; i<8; i++)             //8位计数器
+  35   1          {
+  36   2              SCLK = 0;                   //时钟线拉低
+  37   2              Delayxx();                    //延时等待
+  38   2      
+  39   2              dat >>= 1;                  //数据右移一位
+  40   2              if (IO) dat |= 0x80;        //读取数据
+  41   2              SCLK = 1;                   //时钟线拉高
+  42   2              Delayxx();                    //?óê±μè′y
+  43   2          }
+  44   1          return dat;
+  45   1      }
+  46          
+  47          /**************************************
+  48          向DS1302写1字节数据
+  49          **************************************/
+  50          void DS1302_Writeuchar(uchar dat)
+  51          {
+  52   1          char i = 0;
+  53   1          for (i=0; i<8; i++)             //8位计数器
+  54   1          {
+  55   2              SCLK = 0;                   //时钟线拉低
+C51 COMPILER V9.01   DS1302                                                                01/14/2019 21:22:35 PAGE 2   
 
-  56   2              IO = CY;                    //送出到端口
-  57   2              SCLK = 1;                   //时钟线拉高
-  58   2              Delayxx();                    //延时等待
-  59   2          }
-  60   1      }
-  61          
-  62          /**************************************
-  63          读DS1302某地址的的数据
-  64          **************************************/
-  65          uchar DS1302_ReadData(uchar addr)
-  66          {
-  67   1          uchar dat;
-  68   1          RST = 0;
-  69   1          Delayxx();                        //延时等待
-  70   1          SCLK = 0;
+  56   2              Delayxx();                    //延时等待
+  57   2              dat >>= 1;                  //移出数据
+  58   2              IO = CY;                    //送出到端口
+  59   2              SCLK = 1;                   //时钟线拉高
+  60   2              Delayxx();                    //延时等待
+  61   2          }
+  62   1      }
+  63          
+  64          /**************************************
+  65          读DS1302某地址的的数据
+  66          **************************************/
+  67          uchar DS1302_ReadData(uchar addr)
+  68          {
+  69   1          uchar dat;
+  70   1          RST = 0;
   71   1          Delayxx();                        //延时等待
-  72   1          //_nop_();
-  73   1          RST = 1;
-  74   1          Delayxx();                        //延时等待
-  75   1          //_nop_();
-  76   1          DS1302_Writeuchar(addr);         //写地址
-  77   1          dat = DS1302_Readuchar();        //读数据
-  78   1          SCLK = 1;
-  79   1          RST = 0;
-  80   1          return dat;
-  81   1      }
-  82          
-  83          /**************************************
-  84          往DS1302的某个地址写入数据
-  85          **************************************/
-  86          void DS1302_WriteData(uchar addr, uchar dat)
-  87          {
-  88   1          RST = 0;
-  89   1          Delayxx();                        //延时等待
-  90   1          //_nop_();
-  91   1          SCLK = 0;
-  92   1          Delayxx();                        //延时等待
-  93   1          //_nop_();
-  94   1          RST = 1;
-  95   1          Delayxx();                        //延时等待
-  96   1          //_nop_();
-  97   1          DS1302_Writeuchar(addr);         //写地址
-  98   1          DS1302_Writeuchar(dat);          //写数据
-  99   1          SCLK = 1;
- 100   1          RST = 0;
- 101   1      }
- 102          
- 103          /**************************************
- 104          写入初始时间
- 105          **************************************/
- 106          
- 107          /**************************************
- 108          读取当前s时间
- 109          **************************************/
- 110          #ifdef TEST
+  72   1          SCLK = 0;
+  73   1          Delayxx();                        //延时等待
+  74   1          //_nop_();
+  75   1          RST = 1;
+  76   1          Delayxx();                        //延时等待
+  77   1          //_nop_();
+  78   1          DS1302_Writeuchar(addr);         //写地址
+  79   1          dat = DS1302_Readuchar();        //读数据
+  80   1          SCLK = 1;
+  81   1          RST = 0;
+  82   1          return dat;
+  83   1      }
+  84          
+  85          /**************************************
+  86          往DS1302的某个地址写入数据
+  87          **************************************/
+  88          void DS1302_WriteData(uchar addr, uchar dat)
+  89          {
+  90   1          RST = 0;
+  91   1          Delayxx();                        //延时等待
+  92   1          //_nop_();
+  93   1          SCLK = 0;
+  94   1          Delayxx();                        //延时等待
+  95   1          //_nop_();
+  96   1          RST = 1;
+  97   1          Delayxx();                        //延时等待
+  98   1          //_nop_();
+  99   1          DS1302_Writeuchar(addr);         //写地址
+ 100   1          DS1302_Writeuchar(dat);          //写数据
+ 101   1          SCLK = 1;
+ 102   1          RST = 0;
+ 103   1      }
+ 104          
+ 105          /**************************************
+ 106          写入初始时间
+ 107          **************************************/
+ 108          
+ 109          /**************************************
+ 110          读取当前s时间
+ 111          **************************************/
+ 112          #ifdef TEST
               uchar ds1302_read_sec( )
               {
                   uchar sec;// = 0;// 
                   sec =  DS1302_ReadData(0x83);
                   send_integ((sec>>4)*10+  (sec&0xF));
+C51 COMPILER V9.01   DS1302                                                                01/14/2019 21:22:35 PAGE 3   
+
                   send_char(':');     
                   sec = DS1302_ReadData(0x81);
-C51 COMPILER V9.01   DS1302                                                                12/20/2018 20:23:42 PAGE 3   
-
                   send_integ((sec>>4)*10+  (sec&0xF));
                   return sec;//( DS1302_ReadData(0x81));
               }
               #endif
- 122          void ds1302_stop()
- 123          {
- 124   1          //DS1302_WriteData(0x8e, 0x00);   //允许写操作
- 125   1          //DS1302_WriteData(0x80, 0x80);
- 126   1          //DS1302_WriteData(0x8e, 0x80);   //写保护
- 127   1          g_1302_vcc = 0;
- 128   1      }  
- 129          uchar volatile g_ds1302_1s = 0;
- 130          void ds1302_start()
- 131          {   
- 132   1          g_1302_vcc = 1;
- 133   1          g_ds1302_1s = 0;
- 134   1          DS1302_WriteData(0x8e, 0x00);   //允许写操作
- 135   1          DS1302_WriteData(0x80, 0x01);
- 136   1          DS1302_WriteData(0x8e, 0x80);   //写保护
- 137   1      }
- 138          
- 139          char ds1302_1s_trigger()
- 140          {
- 141   1          uchar x=0;
- 142   1          x =  DS1302_ReadData(0x81); 
- 143   1          x =  /*((x)>>4)*10 + */(x&0xF);
- 144   1          if(g_ds1302_1s != x)
- 145   1          {    
- 146   2              g_ds1302_1s = x;
- 147   2              return 1;
- 148   2          }
- 149   1          else
- 150   1          {
- 151   2              send_char('x');//send_integ(x);
- 152   2              return 0;
- 153   2          }
- 154   1      }
- 155          
- 156          #ifdef TEST
+ 124          void ds1302_stop()
+ 125          {                               
+ 126   1         // RST =  SCLK  =IO=0;
+ 127   1          DS1302_WriteData(0x8e, 0x00);   //允许写操作
+ 128   1          DS1302_WriteData(0x80, 0x80);
+ 129   1          DS1302_WriteData(0x8e, 0x80);   //写保护
+ 130   1         // g_1302_vcc = OFF;
+ 131   1      }  
+ 132          void ds1302_shutdown()
+ 133          {
+ 134   1          g_1302_vcc = OFF;
+ 135   1      }
+ 136          uchar volatile g_ds1302_1s = 0;
+ 137          void ds1302_start()
+ 138          {   
+ 139   1          g_1302_vcc = ON; 
+ 140   1          g_ds1302_1s = 0;
+ 141   1          DS1302_WriteData(0x8e, 0x00);   //允许写操作
+ 142   1          DS1302_WriteData(0x80, 0x01);
+ 143   1          DS1302_WriteData(0x8e, 0x80);   //写保护
+ 144   1      }
+ 145          
+ 146          char ds1302_1s_trigger()
+ 147          {
+ 148   1          uchar x=0;
+ 149   1          x =  DS1302_ReadData(0x81); 
+ 150   1          x =  /*((x)>>4)*10 + */(x&0xF);
+ 151   1          if(g_ds1302_1s != x)
+ 152   1          {    
+ 153   2              g_ds1302_1s = x;
+ 154   2              return 1;
+ 155   2          }
+ 156   1          else
+ 157   1          {
+ 158   2              send_char('x');//send_integ(x);
+ 159   2              return 0;
+ 160   2          }
+ 161   1      }
+ 162          
+ 163          #ifdef TEST
                                   //秒    分    时    日    月  星期    年
               uchar code init[] = {0x80, 0x00, 0x20, 0x01, 0x01, 0x05, 0x10};
               
@@ -183,29 +190,31 @@ line level    source
                   }
                   DS1302_WriteData(0x8e, 0x80);   //写保护
               }
-              #endif
- 174          /**************************************
- 175          初始化DS1302
- 176          **************************************/
- 177          void ds1302_init()
- 178          {
- 179   1          RST = 0;
-C51 COMPILER V9.01   DS1302                                                                12/20/2018 20:23:42 PAGE 4   
+C51 COMPILER V9.01   DS1302                                                                01/14/2019 21:22:35 PAGE 4   
 
- 180   1          SCLK = 0;                      
- 181   1          //DS1302_WriteData(0x8e, 0x00);   //允许写操作
- 182   1          //DS1302_WriteData(0x80, 55);     //时钟启动
- 183   1          //DS1302_WriteData(0x90, 0xa6);   //一个二极管＋4K电阻充电
- 184   1          //DS1302_WriteData(0x8e, 0x80);   //写保护
- 185   1          //DS1302_Initial();               //初始化DS1302
- 186   1      #ifdef TEST
+              #endif
+ 181          /**************************************
+ 182          初始化DS1302
+ 183          **************************************/
+ 184          void ds1302_init()
+ 185          {            
+ 186   1          g_1302_vcc = ON; 
+ 187   1               _nop_(); _nop_();
+ 188   1          RST = 0;
+ 189   1          SCLK = 0;                      
+ 190   1          //DS1302_WriteData(0x8e, 0x00);   //允许写操作
+ 191   1          //DS1302_WriteData(0x80, 55);     //时钟启动
+ 192   1          //DS1302_WriteData(0x90, 0xa6);   //一个二极管＋4K电阻充电
+ 193   1          //DS1302_WriteData(0x8e, 0x80);   //写保护
+ 194   1          //DS1302_Initial();               //初始化DS1302
+ 195   1      #ifdef TEST
                   DS1302_SetTime(init);           //设置初始时间
               #endif
- 189   1      }
+ 198   1      }
 
 
 MODULE INFORMATION:   STATIC OVERLAYABLE
-   CODE SIZE        =    157    ----
+   CODE SIZE        =    180    ----
    CONSTANT SIZE    =   ----    ----
    XDATA SIZE       =   ----    ----
    PDATA SIZE       =      1    ----

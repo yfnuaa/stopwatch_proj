@@ -34,4 +34,7 @@ void Time0(void) interrupt 1 using 1  //“interrupt”声明函数为中断服务函数
     ET0=1; //定时器T0 中断允许    
     TR0=1; //启动定时器T0
 }
- 
+void stop_sys_timer(void)
+{
+TR0= 0 ;
+}
