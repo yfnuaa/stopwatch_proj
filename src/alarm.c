@@ -32,7 +32,7 @@ void init_timer2(void)
 {
     T2L = g_HZ_L_duty_l;   //65536-11.0592M/12/1000
     T2H = g_HZ_H_duty_l;   
-    // AUXR &= 0xFB;       //1/12 T
+    //AUXR &= 0xFB;       //1/12 T
     AUXR |= 0x04;           //Timer clock is 1T mode
     AUXR |= 0x10;          //启动定时器
     IE2  |= ET2;           //使能定时器中断
@@ -106,7 +106,7 @@ void set_HZ(float HZ)
 
 void start_alarm()
 {	
-   // buzzer_pin_high_output;
+    // buzzer_pin_high_output;
     init_timer2();
 }
 
@@ -114,7 +114,7 @@ void stop_alarm()
 {
     AUXR &= 0xEF;                    //停止定时器
     //IE2 = IE2&(~ET2);
-//	buzzer_pin_normal;
+    //buzzer_pin_normal;
     g_buzzer = OFF;
 }
 
@@ -138,7 +138,6 @@ void update_breath_blink()
         g_led_R_port = OFF;
     }
 
-
     if(g_led_G_port != ON && g_ledG_counter <= g_ledG_duty)
     {
         g_led_G_port = ON;
@@ -147,7 +146,6 @@ void update_breath_blink()
     {
         g_led_G_port = OFF;
     }
-
 
     if(g_led_B_port != ON  && g_ledB_counter <= g_ledB_duty)
     {
@@ -158,14 +156,17 @@ void update_breath_blink()
         g_led_B_port = OFF;
     }
 }
+
 bit g_breath_led_on = 0;
 char g_breath_led_r_direction, g_breath_led_g_direction, g_breath_led_b_direction;
+
 void close_rgb_led()
 {
     g_led_R_port = g_led_G_port = g_led_B_port = OFF;
-    g_breath_led_on = 0;     IE2 &= ~ET4;  // stop blink 
-
+    g_breath_led_on = 0; 
+    IE2 &= ~ET4;  // stop blink 
 }
+#define DIM_STEPS 1
 void poll_led_breath_1700us()
 {
     g_ledR_counter++;
@@ -186,16 +187,16 @@ void poll_led_breath_1700us()
         {
             duty_counter = 0;
             
-            if(g_ledR_duty >= 30) { g_breath_led_r_direction=-3; }
-            else if (g_ledR_duty < 2) { g_breath_led_r_direction=3; }
+            if(g_ledR_duty >= 30) { g_breath_led_r_direction =- DIM_STEPS; }
+            else if (g_ledR_duty < 2) { g_breath_led_r_direction = DIM_STEPS; }
             g_ledR_duty += g_breath_led_r_direction;
             
-            if(g_ledG_duty >= 30) { g_breath_led_g_direction=-3; }
-            else if (g_ledG_duty < 2) { g_breath_led_g_direction=3; }
+            if(g_ledG_duty >= 30) { g_breath_led_g_direction =- DIM_STEPS; }
+            else if (g_ledG_duty < 2) { g_breath_led_g_direction = DIM_STEPS; }
             g_ledG_duty += g_breath_led_g_direction;
             
-            if(g_ledB_duty >= 30) { g_breath_led_b_direction=-3; }
-            else if (g_ledB_duty < 2) { g_breath_led_b_direction=3; }
+            if(g_ledB_duty >= 30) { g_breath_led_b_direction =- DIM_STEPS; }
+            else if (g_ledB_duty < 2) { g_breath_led_b_direction = DIM_STEPS; }
             g_ledB_duty += g_breath_led_b_direction; 
         }
     }
@@ -264,7 +265,7 @@ void start_breath_blink()
     g_breath_led_b_direction = 3;
 //  g_led_timer_HL = 0xFFD8;  //10us  //0xFFD8  Tled= 1ms  1000 HZ
 //  g_led_timer_HL = 0xFFB0;  //20us  //0xFFB0  Tled= 2ms  500  HZ
-//    g_led_timer_HL = 0xE570;// 0xE570;  //1.7ms  // Tled= 17ms  at 60HZ
+//  g_led_timer_HL = 0xE570;// 0xE570;  //1.7ms  // Tled= 17ms  at 60HZ
     Timer4Init_breath_1700us();
 }
 void start_alarm_blink()
